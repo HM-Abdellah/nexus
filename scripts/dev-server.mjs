@@ -30,7 +30,7 @@ export function resolveStaticFilePath(requestPath, root = PROJECT_ROOT) {
     return null;
   }
 
-  const relativePath = decodedPath === "/" ? "index.html" : decodedPath.replace(/^\\/+/, "");
+  const relativePath = decodedPath === "/" ? "index.html" : decodedPath.slice(1);
   const absolutePath = path.resolve(root, relativePath);
   const normalizedRoot = path.resolve(root);
 
