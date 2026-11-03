@@ -134,7 +134,7 @@ function renderCaseLibrary() {
     '</section><section class="panel"><div class="panel-header"><div><h2 class="section-title">Available investigations</h2>' +
     '<p class="section-caption">' + formatCount(matches.length) + ' matching scenario(s)</p></div></div><div class="panel-body"><div class="case-list">' +
     (matches.length ? matches.map((item) => renderCaseCard(item, false)).join("") :
-    '<div class="activity-empty">' + icon("searchFolder") + "<strong>No cases found</strong><p>Try another case ID, title, or keyword.</p></div>') +
+    '<div class="activity-empty">' + icon("searchFolder") + "<strong>No cases found</strong><p>Try another case ID, title, or keyword.</p></div>") +
     "</div></div></section></div></main>";
 }
 
