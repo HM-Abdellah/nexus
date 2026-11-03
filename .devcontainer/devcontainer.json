@@ -1,0 +1,12 @@
+{
+  "name": "NEXUS Development",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:26-bookworm",
+  "forwardPorts": [4173],
+  "portsAttributes": {
+    "4173": {
+      "label": "NEXUS local preview",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm run check && npm test"
+}

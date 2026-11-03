@@ -20,44 +20,51 @@ NEXUS is an educational simulation. It is not a certified forensic tool and does
 ## Technology baseline
 
 - HTML5, CSS3, and vanilla JavaScript (ES modules)
+- Node.js 26 LTS for development tooling and tests
 - JSON case datasets
 - IndexedDB for investigation state
 - Web Crypto API for supported hashing operations
 - Node.js built-in test runner
 - GitHub Actions for continuous integration
 
-Frameworks and dependencies will only be introduced when a documented requirement justifies them.
+No runtime dependencies are currently required.
 
-## Getting started
+## Development
 
-The project is currently a static browser application. From the repository root, start a local static HTTP server, for example:
+Open the repository in GitHub Codespaces or use a local Node.js 26 installation.
 
-```bash
-python3 -m http.server 4173 --bind 0.0.0.0
-```
+Start the local preview server:
 
-Then open the forwarded port **4173** in your development environment.
+\`\`\`bash
+npm run dev
+\`\`\`
 
-Run the automated tests with:
+Open port **4173** when the development environment forwards it.
 
-```bash
+Run the syntax checks and unit tests:
+
+\`\`\`bash
+npm run check
 npm test
-```
+\`\`\`
 
 ## Project structure
 
-```text
+\`\`\`text
 .
-├── docs/                 # Product and engineering documentation
+├── .devcontainer/         # Reproducible Codespaces environment
+├── .github/workflows/     # Continuous integration
+├── docs/                  # Product and engineering documentation
+├── scripts/               # Local development utilities
 ├── src/
-│   ├── app/              # Application bootstrap and navigation
-│   ├── core/             # Shared application utilities
+│   ├── app/               # Application bootstrap and navigation
+│   ├── core/              # Shared application utilities
 │   ├── data/              # Demo content and future case datasets
-│   └── styles/           # Design tokens and interface styles
-├── tests/                # Automated tests
+│   └── styles/            # Design tokens and interface styles
+├── tests/                 # Automated tests
 ├── index.html
 └── package.json
-```
+\`\`\`
 
 ## Design direction
 
@@ -78,7 +85,7 @@ npm test
 
 ## Documentation
 
-Engineering documentation lives in [`docs/`](docs/). The specifications will evolve alongside implementation; approved decisions and deferred proposals must remain distinguishable.
+Engineering documentation lives in the docs directory. The specifications will evolve alongside implementation; approved decisions and deferred proposals must remain distinguishable.
 
 ## License
 
