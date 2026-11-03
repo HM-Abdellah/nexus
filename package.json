@@ -1,0 +1,14 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A digital forensics training workbench for synthetic evidence.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/app/main.js && node --check src/app/router.js && node --check src/core/format.js && node --check src/data/cases.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
