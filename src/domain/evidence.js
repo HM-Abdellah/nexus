@@ -30,7 +30,7 @@ export function validateEvidenceRecord(record) {
     throw new TypeError("Evidence type is not supported.");
   }
 
-  const isoUtcTimestamp = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/;
+  const isoUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
   const parsedTimestamp = new Date(record.collectedAt);
 
   if (
