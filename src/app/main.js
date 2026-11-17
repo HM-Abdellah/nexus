@@ -170,12 +170,27 @@ function renderEvidenceListItem(record, selected) {
 function renderEvidenceWorkspace(caseId) {
   const records = getEvidenceForCase(CASE_001_EVIDENCE, caseId);
   const visibleRecords = filterEvidence(records, state.evidenceSearch);
-  const selectedRecord = findEvidenceById(records, state.selectedEvidenceId) ?? records[0] ?? null;
+  const selectedRecord = findEvidenceById(visibleRecords, state.selectedEvidenceId) ??
+    visibleRecords[0] ?? null;
 
-  if (!selectedRecord) {
+  if (!records.length) {
     return '<section class="panel"><div class="panel-body"><div class="activity-empty">' +
       icon("info") + "<strong>No evidence dataset is available</strong>" +
       "<p>This training case does not currently include evidence records.</p></div></div></section>";
+  }
+
+  if (!selectedRecord) {
+    return '<section class="evidence-workspace"><aside class="panel evidence-browser"><div class="panel-header">' +
+      '<div><h2 class="section-title">Evidence</h2><p class="section-caption">' +
+      formatCount(records.length) + " synthetic records</p></div></div><div class=\"panel-body\">" +
+      '<form class="evidence-search" id="evidence-search" role="search">' + icon("search") +
+      '<input id="evidence-search-input" type="search" name="q" placeholder="Filter evidence…" aria-label="Filter evidence" autocomplete="off">' +
+      '</form><div class="evidence-empty">No matching evidence records.</div></div></aside>' +
+      '<section class="panel evidence-detail"><div class="panel-body"><div class="activity-empty">' +
+      icon("searchFolder") + "<strong>No matching evidence</strong>" +
+      "<p>Try a different evidence ID, filename, source, or keyword.</p></div></div></section></section>" +
+      '<p class="synthetic-notice">' + icon("info") +
+      "<span>Training simulation: all records in this case are synthetic. No real accounts, devices, or user files are involved.</span></p>";
   }
 
   const isHashing = state.hashStatus?.evidenceId === selectedRecord.id &&
