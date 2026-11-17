@@ -46,7 +46,7 @@ export function isPublicRelativePath(relativePath) {
   if (rootName !== "src" || segments.length < 3) return false;
 
   if (rootName === "src") {
-    if (area === "app" || area === "core") {
+    if (area === "app" || area === "core" || area === "domain") {
       return extension === ".js" || extension === ".mjs";
     }
 
