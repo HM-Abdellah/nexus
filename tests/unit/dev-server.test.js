@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { resolveStaticFilePath } from "../../scripts/dev-server.mjs";
+import { isPublicRelativePath, resolveStaticFilePath } from "../../scripts/dev-server.mjs";
 
 const root = path.resolve("/workspace/nexus");
 
@@ -21,6 +21,30 @@ test("parent-directory traversal is rejected", () => {
   assert.equal(resolveStaticFilePath("/%2e%2e/secrets.txt", root), null);
 });
 
-test("malformed URL encoding is rejected", () => {
+test("malformed URL encoding and backslash paths are rejected", () => {
   assert.equal(resolveStaticFilePath("/bad%ZZpath", root), null);
+  assert.equal(resolveStaticFilePath("/src\\app\\main.js", root), null);
+});
+
+test("private project files and folders are not public", () => {
+  for (const requestPath of [
+    "/README.md",
+    "/package.json",
+    "/scripts/dev-server.mjs",
+    "/tests/unit/router.test.js",
+    "/.devcontainer/devcontainer.json",
+    "/.github/workflows/ci.yml",
+    "/.git/config"
+  ]) {
+    assert.equal(resolveStaticFilePath(requestPath, root), null, requestPath);
+  }
+});
+
+test("only approved source asset types are public", () => {
+  assert.equal(isPublicRelativePath("src/app/main.js"), true);
+  assert.equal(isPublicRelativePath("src/styles/app.css"), true);
+  assert.equal(isPublicRelativePath("src/data/cases.json"), true);
+  assert.equal(isPublicRelativePath("src/app/secrets.json"), false);
+  assert.equal(isPublicRelativePath("src/styles/app.js"), false);
+  assert.equal(isPublicRelativePath("public/assets/logo.svg"), true);
 });
