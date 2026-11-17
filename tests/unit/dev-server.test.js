@@ -42,6 +42,7 @@ test("private project files and folders are not public", () => {
 
 test("only approved source asset types are public", () => {
   assert.equal(isPublicRelativePath("src/app/main.js"), true);
+  assert.equal(isPublicRelativePath("src/domain/evidence.js"), true);
   assert.equal(isPublicRelativePath("src/styles/app.css"), true);
   assert.equal(isPublicRelativePath("src/data/cases.json"), true);
   assert.equal(isPublicRelativePath("src/app/secrets.json"), false);
