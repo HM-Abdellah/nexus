@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,8 +14,49 @@ const MIME_TYPES = Object.freeze({
   ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8"
 });
+
+const PUBLIC_ASSET_EXTENSIONS = new Set([
+  ".css", ".js", ".mjs", ".json", ".svg", ".png",
+  ".jpg", ".jpeg", ".webp", ".ico", ".woff2"
+]);
+
+export function isPublicRelativePath(relativePath) {
+  if (relativePath === "index.html") return true;
+
+  const segments = String(relativePath).split("/");
+  if (segments.length < 3 || segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    return false;
+  }
+
+  const extension = path.extname(relativePath).toLowerCase();
+  const [rootName, area] = segments;
+
+  if (rootName === "src") {
+    if (area === "app" || area === "core") {
+      return extension === ".js" || extension === ".mjs";
+    }
+
+    if (area === "data") {
+      return [".js", ".mjs", ".json"].includes(extension);
+    }
+
+    if (area === "styles") {
+      return extension === ".css";
+    }
+
+    return false;
+  }
+
+  return rootName === "public" && PUBLIC_ASSET_EXTENSIONS.has(extension);
+}
 
 export function resolveStaticFilePath(requestPath, root = PROJECT_ROOT) {
   let decodedPath;
@@ -26,11 +67,22 @@ export function resolveStaticFilePath(requestPath, root = PROJECT_ROOT) {
     return null;
   }
 
-  if (!decodedPath.startsWith("/") || decodedPath.includes(String.fromCharCode(0))) {
+  if (
+    !decodedPath.startsWith("/") ||
+    decodedPath.includes(String.fromCharCode(0)) ||
+    decodedPath.includes("\\")
+  ) {
     return null;
   }
 
-  const relativePath = decodedPath === "/" ? "index.html" : decodedPath.slice(1);
+  const segments = decodedPath === "/" ? [] : decodedPath.slice(1).split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    return null;
+  }
+
+  const relativePath = decodedPath === "/" ? "index.html" : segments.join("/");
+  if (!isPublicRelativePath(relativePath)) return null;
+
   const absolutePath = path.resolve(root, relativePath);
   const normalizedRoot = path.resolve(root);
 
@@ -71,8 +123,21 @@ const server = createServer(async (request, response) => {
   }
 
   try {
-    const content = await readFile(targetPath);
-    const contentType = MIME_TYPES[path.extname(targetPath).toLowerCase()] ?? "application/octet-stream";
+    // Resolve symlinks before reading, then re-check the resolved target against
+    // the public-file allowlist to prevent a public path from exposing private files.
+    const [realProjectRoot, realTargetPath] = await Promise.all([
+      realpath(PROJECT_ROOT),
+      realpath(targetPath)
+    ]);
+    const realRelativePath = path.relative(realProjectRoot, realTargetPath).split(path.sep).join("/");
+
+    if (!isPublicRelativePath(realRelativePath)) {
+      sendText(response, 403, "Forbidden");
+      return;
+    }
+
+    const content = await readFile(realTargetPath);
+    const contentType = MIME_TYPES[path.extname(realTargetPath).toLowerCase()] ?? "application/octet-stream";
 
     response.writeHead(200, {
       "content-type": contentType,
