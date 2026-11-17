@@ -32,12 +32,18 @@ export function isPublicRelativePath(relativePath) {
   if (relativePath === "index.html") return true;
 
   const segments = String(relativePath).split("/");
-  if (segments.length < 3 || segments.some((segment) => !segment || segment === "." || segment === "..")) {
+  if (segments.length < 2 || segments.some((segment) => !segment || segment === "." || segment === "..")) {
     return false;
   }
 
   const extension = path.extname(relativePath).toLowerCase();
   const [rootName, area] = segments;
+
+  if (rootName === "public") {
+    return PUBLIC_ASSET_EXTENSIONS.has(extension);
+  }
+
+  if (rootName !== "src" || segments.length < 3) return false;
 
   if (rootName === "src") {
     if (area === "app" || area === "core") {
