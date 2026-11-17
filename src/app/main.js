@@ -1,4 +1,4 @@
-import { CASES, findCaseById } from "../data/cases.js";
+import { CASES, filterCases, findCaseById } from "../data/cases.js";
 import { escapeHtml, formatCount } from "../core/format.js";
 import { resolveRoute } from "./router.js";
 
@@ -118,10 +118,7 @@ function renderDashboard() {
 }
 
 function renderCaseLibrary() {
-  const query = state.caseSearch.trim().toLowerCase();
-  const matches = CASES.filter((item) =>
-    [item.id, item.title, item.category, item.description, ...item.topics].join(" ").toLowerCase().includes(query)
-  );
+  const matches = filterCases(CASES, state.caseSearch);
 
   return '<main class="main-area" id="main-content" tabindex="-1"><div class="page-container"><section class="page-heading">' +
     '<div><p class="eyebrow">Main / Investigations</p><h1 class="page-title">Case Library</h1>' +
@@ -202,8 +199,15 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const input = document.querySelector("#global-search-input");
   state.caseSearch = input?.value ?? "";
-  window.location.hash = "/cases";
   state.sidebarOpen = false;
+
+  // Hash changes do not fire when the current route is already /cases.
+  // Render directly in that case so repeated searches always refresh results.
+  if (resolveRoute(window.location.hash).name === "cases") {
+    render();
+  } else {
+    window.location.hash = "/cases";
+  }
 });
 
 app.addEventListener("click", (event) => {
