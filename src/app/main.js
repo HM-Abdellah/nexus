@@ -1,11 +1,30 @@
-import { CASES, findCaseById } from "../data/cases.js";
+import { CASES, filterCases, findCaseById } from "../data/cases.js";
+import { CASE_001_EVIDENCE } from "../data/evidence/case-001.js";
 import { escapeHtml, formatCount } from "../core/format.js";
+import { sha256Hex } from "../core/hash.js";
+import {
+  filterEvidence,
+  findEvidenceById,
+  formatBytes,
+  getEvidenceForCase,
+  getEvidenceSizeBytes
+} from "../domain/evidence.js";
 import { resolveRoute } from "./router.js";
 
 const app = document.querySelector("#app");
 if (!app) throw new Error("NEXUS application root was not found.");
 
-const state = { terminalOpen: false, terminalExpanded: false, sidebarOpen: false, caseSearch: "" };
+const state = {
+  terminalOpen: false,
+  terminalExpanded: false,
+  sidebarOpen: false,
+  caseSearch: "",
+  evidenceSearch: "",
+  selectedEvidenceId: "EVD-001",
+  hashRequestId: 0,
+  hashStatus: null,
+  hashResult: null
+};
 
 const ICONS = {
   shield: '<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/>',
@@ -23,7 +42,11 @@ const ICONS = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   close: '<path d="m18 6-12 12M6 6l12 12"/>',
   searchFolder: '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v4"/><circle cx="16" cy="17" r="3"/><path d="m18.2 19.2 2 2"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+  hash: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'
 };
 
 function icon(name) {
@@ -118,10 +141,7 @@ function renderDashboard() {
 }
 
 function renderCaseLibrary() {
-  const query = state.caseSearch.trim().toLowerCase();
-  const matches = CASES.filter((item) =>
-    [item.id, item.title, item.category, item.description, ...item.topics].join(" ").toLowerCase().includes(query)
-  );
+  const matches = filterCases(CASES, state.caseSearch);
 
   return '<main class="main-area" id="main-content" tabindex="-1"><div class="page-container"><section class="page-heading">' +
     '<div><p class="eyebrow">Main / Investigations</p><h1 class="page-title">Case Library</h1>' +
@@ -138,20 +158,108 @@ function renderCaseLibrary() {
     "</div></div></section></div></main>";
 }
 
+function renderEvidenceListItem(record, selected) {
+  return '<button type="button" class="evidence-list-button' + (selected ? " is-selected" : "") +
+    '" data-action="select-evidence" data-evidence-id="' + escapeHtml(record.id) +
+    '" aria-pressed="' + String(selected) + '"><span class="evidence-list-icon">' + icon("fileText") +
+    '</span><span class="evidence-list-copy"><strong>' + escapeHtml(record.name) +
+    '</strong><span>' + escapeHtml(record.id) + " · " + escapeHtml(record.type) +
+    '</span></span><span class="evidence-list-arrow">' + icon("arrowRight") + "</span></button>";
+}
+
+function renderEvidenceWorkspace(caseId) {
+  const records = getEvidenceForCase(CASE_001_EVIDENCE, caseId);
+  const visibleRecords = filterEvidence(records, state.evidenceSearch);
+  const selectedRecord = findEvidenceById(visibleRecords, state.selectedEvidenceId) ??
+    visibleRecords[0] ?? null;
+
+  if (!records.length) {
+    return '<section class="panel"><div class="panel-body"><div class="activity-empty">' +
+      icon("info") + "<strong>No evidence dataset is available</strong>" +
+      "<p>This training case does not currently include evidence records.</p></div></div></section>";
+  }
+
+  if (!selectedRecord) {
+    return '<section class="evidence-workspace"><aside class="panel evidence-browser"><div class="panel-header">' +
+      '<div><h2 class="section-title">Evidence</h2><p class="section-caption">' +
+      formatCount(records.length) + " synthetic records</p></div></div><div class=\"panel-body\">" +
+      '<form class="evidence-search" id="evidence-search" role="search">' + icon("search") +
+      '<input id="evidence-search-input" type="search" name="q" placeholder="Filter evidence…" aria-label="Filter evidence" autocomplete="off">' +
+      '</form><div class="evidence-empty">No matching evidence records.</div></div></aside>' +
+      '<section class="panel evidence-detail"><div class="panel-body"><div class="activity-empty">' +
+      icon("searchFolder") + "<strong>No matching evidence</strong>" +
+      "<p>Try a different evidence ID, filename, source, or keyword.</p></div></div></section></section>" +
+      '<p class="synthetic-notice">' + icon("info") +
+      "<span>Training simulation: all records in this case are synthetic. No real accounts, devices, or user files are involved.</span></p>";
+  }
+
+  const isHashing = state.hashStatus?.evidenceId === selectedRecord.id &&
+    state.hashStatus.status === "calculating";
+  const hashError = state.hashStatus?.evidenceId === selectedRecord.id &&
+    state.hashStatus.status === "error";
+  const hashResult = state.hashResult?.evidenceId === selectedRecord.id
+    ? state.hashResult.digest
+    : null;
+
+  const hashPanel = hashResult
+    ? '<div class="hash-result"><div class="hash-result-heading">' + icon("check") +
+      "<strong>SHA-256 calculated</strong></div><code>" + escapeHtml(hashResult) +
+      "</code></div>"
+    : hashError
+      ? '<p class="inline-error" role="alert">Unable to calculate a digest in this browser context.</p>'
+      : '<p class="section-caption">The digest is calculated locally in your browser from the displayed synthetic content.</p>';
+
+  return '<section class="evidence-workspace" aria-label="Evidence explorer">' +
+    '<aside class="panel evidence-browser"><div class="panel-header"><div><h2 class="section-title">Evidence</h2>' +
+    '<p class="section-caption">' + formatCount(records.length) + ' synthetic records</p></div>' +
+    '<span class="status status-available">Read only</span></div><div class="panel-body">' +
+    '<form class="evidence-search" id="evidence-search" role="search">' + icon("search") +
+    '<input id="evidence-search-input" type="search" name="q" placeholder="Filter evidence…" aria-label="Filter evidence" autocomplete="off">' +
+    '</form><div class="evidence-list" aria-label="Evidence records">' +
+    (visibleRecords.length
+      ? visibleRecords.map((record) => renderEvidenceListItem(record, record.id === selectedRecord.id)).join("")
+      : '<div class="evidence-empty">No matching evidence records.</div>') +
+    '</div></div></aside><section class="panel evidence-detail"><div class="panel-header">' +
+    '<div><p class="eyebrow">Selected evidence</p><h2 class="section-title">' + escapeHtml(selectedRecord.name) +
+    '</h2><p class="section-caption mono">' + escapeHtml(selectedRecord.id) + '</p></div>' +
+    '<span class="tag">' + escapeHtml(selectedRecord.type) + '</span></div><div class="panel-body">' +
+    '<p class="case-description">' + escapeHtml(selectedRecord.description) + '</p>' +
+    '<dl class="evidence-metadata"><div><dt>Source</dt><dd>' + escapeHtml(selectedRecord.source) +
+    '</dd></div><div><dt>Collected (UTC)</dt><dd>' + escapeHtml(selectedRecord.collectedAt) +
+    '</dd></div><div><dt>Content size</dt><dd>' + formatBytes(getEvidenceSizeBytes(selectedRecord)) +
+    '</dd></div></dl><div class="evidence-content-heading"><h3>Original content</h3><span class="section-caption">Read-only preview</span></div>' +
+    '<pre class="evidence-content" tabindex="0"><code>' + escapeHtml(selectedRecord.content) + '</code></pre>' +
+    '<div class="integrity-panel"><div class="integrity-copy"><h3>Content integrity</h3>' +
+    '<p>Create a fingerprint for this exact content. Compare it with a trusted digest to detect changes.</p></div>' +
+    '<button class="button button-secondary" type="button" data-action="hash-evidence" data-evidence-id="' +
+    escapeHtml(selectedRecord.id) + '"' + (isHashing ? " disabled" : "") + '>' +
+    icon("hash") + (isHashing ? "Calculating…" : "Calculate SHA-256") + "</button></div>" +
+    hashPanel + '<p class="integrity-disclaimer">A matching digest can show that content is unchanged relative to a known digest. It does not prove who created the content, where it came from, or that it is authentic.</p>' +
+    '</div></section></section><p class="synthetic-notice">' + icon("info") +
+    '<span>Training simulation: all records in this case are synthetic. No real accounts, devices, or user files are involved.</span></p>';
+}
+
 function renderCaseOverview(caseId) {
   const item = findCaseById(caseId);
   if (!item) return renderNotFound("This case is not available in the current catalog.");
 
+  const records = getEvidenceForCase(CASE_001_EVIDENCE, caseId);
+  if (!records.some((record) => record.id === state.selectedEvidenceId)) {
+    state.selectedEvidenceId = records[0]?.id ?? null;
+    state.hashResult = null;
+    state.hashStatus = null;
+  }
+
   return '<main class="main-area" id="main-content" tabindex="-1"><div class="page-container"><p class="eyebrow"><a href="#/cases">Case Library</a> / ' +
-    escapeHtml(item.id) + "</p><section class=\"page-heading\"><div><span class=\"status status-available\">Available</span>" +
+    escapeHtml(item.id) + "</p><section class=\"page-heading\"><div><span class=\"status status-available\">Training case</span>" +
     '<h1 class="page-title" style="margin-top:12px">' + escapeHtml(item.title) + '</h1><p class="page-description">' +
-    escapeHtml(item.category) + "</p></div><a class=\"button button-secondary\" href=\"#/cases\">Back to library</a></section>" +
-    '<section class="panel"><div class="panel-header"><h2 class="section-title">Investigation background</h2><span class="mono subtle">' +
-    escapeHtml(item.id) + "</span></div><div class=\"panel-body\"><p class=\"case-description\">" + escapeHtml(item.description) +
-    '</p><div class="tag-list" style="margin-top:16px">' + item.topics.map((topic) => '<span class="tag">' + escapeHtml(topic) + "</span>").join("") +
-    '</div></div></section><section class="panel" style="margin-top:16px"><div class="panel-header"><h2 class="section-title">Investigation workspace</h2>' +
-    '<span class="status status-planned">Not yet available</span></div><div class="panel-body"><div class="terminal-notice">' + icon("info") +
-    "<p>The case overview is available as part of the foundation milestone. The evidence dataset and investigation workflow are being specified and will be enabled in a later milestone.</p></div></div></section></div></main>";
+    escapeHtml(item.category) + " · " + formatCount(records.length) + " synthetic evidence records</p></div>" +
+    '<a class="button button-secondary" href="#/cases">Back to library</a></section>' +
+    '<section class="panel case-background"><div class="panel-header"><h2 class="section-title">Investigation brief</h2>' +
+    '<span class="mono subtle">' + escapeHtml(item.id) + '</span></div><div class="panel-body"><p class="case-description">' +
+    escapeHtml(item.description) + '</p><div class="tag-list case-topic-list">' +
+    item.topics.map((topic) => '<span class="tag">' + escapeHtml(topic) + "</span>").join("") +
+    '</div></div></section>' + renderEvidenceWorkspace(caseId) + '</div></main>';
 }
 
 function renderSettings() {
@@ -195,22 +303,82 @@ function render() {
   app.innerHTML = '<div class="app-shell">' + renderSidebar(route) + renderTopbar() + content + "</div>" + renderTerminal();
   const searchInput = document.querySelector("#global-search-input");
   if (searchInput) searchInput.value = state.caseSearch;
+
+  const evidenceSearchInput = document.querySelector("#evidence-search-input");
+  if (evidenceSearchInput) evidenceSearchInput.value = state.evidenceSearch;
 }
 
 app.addEventListener("submit", (event) => {
+  if (event.target.id === "evidence-search") {
+    event.preventDefault();
+    const input = document.querySelector("#evidence-search-input");
+    state.evidenceSearch = input?.value ?? "";
+
+    const route = resolveRoute(window.location.hash);
+    const caseRecords = getEvidenceForCase(CASE_001_EVIDENCE, route.caseId);
+    const matches = filterEvidence(caseRecords, state.evidenceSearch);
+    state.selectedEvidenceId = matches[0]?.id ?? null;
+    state.hashRequestId += 1;
+    state.hashStatus = null;
+    state.hashResult = null;
+    render();
+    return;
+  }
+
   if (event.target.id !== "global-search") return;
   event.preventDefault();
   const input = document.querySelector("#global-search-input");
   state.caseSearch = input?.value ?? "";
-  window.location.hash = "/cases";
   state.sidebarOpen = false;
+
+  // Hash changes do not fire when the current route is already /cases.
+  // Render directly in that case so repeated searches always refresh results.
+  if (resolveRoute(window.location.hash).name === "cases") {
+    render();
+  } else {
+    window.location.hash = "/cases";
+  }
 });
+
+async function calculateEvidenceHash(evidenceId) {
+  const record = findEvidenceById(CASE_001_EVIDENCE, evidenceId);
+  if (!record) return;
+
+  const requestId = ++state.hashRequestId;
+  state.hashStatus = { evidenceId, status: "calculating" };
+  state.hashResult = null;
+  render();
+
+  try {
+    const digest = await sha256Hex(record.content);
+    if (requestId !== state.hashRequestId) return;
+
+    state.hashStatus = null;
+    state.hashResult = { evidenceId, digest };
+  } catch {
+    if (requestId !== state.hashRequestId) return;
+    state.hashStatus = { evidenceId, status: "error" };
+  }
+
+  render();
+}
 
 app.addEventListener("click", (event) => {
   const control = event.target.closest("[data-action]");
   if (!control) return;
 
-  if (control.dataset.action === "terminal") {
+  if (control.dataset.action === "select-evidence") {
+    const evidenceId = control.dataset.evidenceId;
+    if (!findEvidenceById(CASE_001_EVIDENCE, evidenceId)) return;
+
+    state.selectedEvidenceId = evidenceId;
+    state.hashRequestId += 1;
+    state.hashStatus = null;
+    state.hashResult = null;
+    render();
+  } else if (control.dataset.action === "hash-evidence") {
+    void calculateEvidenceHash(control.dataset.evidenceId);
+  } else if (control.dataset.action === "terminal") {
     state.terminalOpen = !state.terminalOpen;
     if (!state.terminalOpen) state.terminalExpanded = false;
     render();

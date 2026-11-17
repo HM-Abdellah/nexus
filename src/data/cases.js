@@ -19,3 +19,21 @@ export const CASES = Object.freeze([
 export function findCaseById(caseId) {
   return CASES.find((item) => item.id === caseId) ?? null;
 }
+
+export function filterCases(cases, query = "") {
+  const normalizedQuery = String(query).trim().toLowerCase();
+
+  if (!normalizedQuery) return [...cases];
+
+  return cases.filter((item) => {
+    const searchableText = [
+      item.id,
+      item.title,
+      item.category,
+      item.description,
+      ...item.topics
+    ].join(" ").toLowerCase();
+
+    return searchableText.includes(normalizedQuery);
+  });
+}

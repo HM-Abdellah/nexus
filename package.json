@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "test": "node --test",
-    "check": "node --check src/app/main.js && node --check src/app/router.js && node --check src/core/format.js && node --check src/data/cases.js && node --check scripts/dev-server.mjs"
+    "check": "node --check src/app/main.js && node --check src/app/router.js && node --check src/core/format.js && node --check src/core/hash.js && node --check src/domain/evidence.js && node --check src/data/cases.js && node --check src/data/evidence/case-001.js && node --check scripts/dev-server.mjs && node --check scripts/build.mjs",
+    "build": "node scripts/build.mjs"
   },
   "engines": {
     "node": ">=26"
