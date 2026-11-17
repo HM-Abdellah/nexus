@@ -230,7 +230,7 @@ function renderEvidenceWorkspace(caseId) {
     '</dd></div></dl><div class="evidence-content-heading"><h3>Original content</h3><span class="section-caption">Read-only preview</span></div>' +
     '<pre class="evidence-content" tabindex="0"><code>' + escapeHtml(selectedRecord.content) + '</code></pre>' +
     '<div class="integrity-panel"><div class="integrity-copy"><h3>Content integrity</h3>' +
-    '<p>Calculate a SHA-256 digest to identify changes to this exact content.</p></div>' +
+    '<p>Create a fingerprint for this exact content. Compare it with a trusted digest to detect changes.</p></div>' +
     '<button class="button button-secondary" type="button" data-action="hash-evidence" data-evidence-id="' +
     escapeHtml(selectedRecord.id) + '"' + (isHashing ? " disabled" : "") + '>' +
     icon("hash") + (isHashing ? "Calculating…" : "Calculate SHA-256") + "</button></div>" +
