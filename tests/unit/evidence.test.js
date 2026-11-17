@@ -44,6 +44,14 @@ test("invalid evidence records are rejected", () => {
     ...CASE_001_EVIDENCE[0],
     type: "unknown"
   }), /not supported/);
+  assert.throws(() => validateEvidenceRecord({
+    ...CASE_001_EVIDENCE[0],
+    collectedAt: "2026-02-31T10:00:00.000Z"
+  }), /ISO-8601 UTC/);
+  assert.throws(() => validateEvidenceRecord({
+    ...CASE_001_EVIDENCE[0],
+    collectedAt: "October 12, 2026"
+  }), /ISO-8601 UTC/);
 });
 
 test("evidence size uses UTF-8 byte length", () => {
@@ -55,4 +63,5 @@ test("evidence size uses UTF-8 byte length", () => {
   assert.equal(formatBytes(2), "2 B");
   assert.equal(formatBytes(1536), "1.5 KB");
   assert.throws(() => formatBytes(-1), RangeError);
+  assert.throws(() => formatBytes(1.5), RangeError);
 });
