@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
 const OUTPUT_DIR = path.join(PROJECT_ROOT, "dist");
 
-const PUBLIC_DIRECTORIES = ["app", "core", "data", "styles"];
+const PUBLIC_DIRECTORIES = ["app", "core", "data", "domain", "styles"];
 
 export async function buildSite() {
   await rm(OUTPUT_DIR, { recursive: true, force: true });
