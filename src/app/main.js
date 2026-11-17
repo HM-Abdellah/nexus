@@ -298,6 +298,14 @@ app.addEventListener("submit", (event) => {
     event.preventDefault();
     const input = document.querySelector("#evidence-search-input");
     state.evidenceSearch = input?.value ?? "";
+
+    const route = resolveRoute(window.location.hash);
+    const caseRecords = getEvidenceForCase(CASE_001_EVIDENCE, route.caseId);
+    const matches = filterEvidence(caseRecords, state.evidenceSearch);
+    state.selectedEvidenceId = matches[0]?.id ?? null;
+    state.hashRequestId += 1;
+    state.hashStatus = null;
+    state.hashResult = null;
     render();
     return;
   }
