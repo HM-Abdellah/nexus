@@ -30,8 +30,15 @@ export function validateEvidenceRecord(record) {
     throw new TypeError("Evidence type is not supported.");
   }
 
-  if (Number.isNaN(Date.parse(record.collectedAt))) {
-    throw new TypeError("Evidence collection timestamp must be a valid date.");
+  const isoUtcTimestamp = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/;
+  const parsedTimestamp = new Date(record.collectedAt);
+
+  if (
+    !isoUtcTimestamp.test(record.collectedAt) ||
+    Number.isNaN(parsedTimestamp.getTime()) ||
+    parsedTimestamp.toISOString() !== record.collectedAt
+  ) {
+    throw new TypeError("Evidence collection timestamp must be a valid ISO-8601 UTC timestamp.");
   }
 
   return true;
@@ -53,7 +60,9 @@ export function findEvidenceById(records, evidenceId) {
     throw new TypeError("Evidence collection must be an array.");
   }
 
-  return records.find((record) => record.id === evidenceId) ?? null;
+  const match = records.find((record) => record.id === evidenceId) ?? null;
+  if (match) validateEvidenceRecord(match);
+  return match;
 }
 
 export function filterEvidence(records, query = "") {
@@ -61,11 +70,12 @@ export function filterEvidence(records, query = "") {
     throw new TypeError("Evidence collection must be an array.");
   }
 
+  for (const record of records) validateEvidenceRecord(record);
+
   const normalizedQuery = String(query).trim().toLowerCase();
   if (!normalizedQuery) return [...records];
 
   return records.filter((record) => {
-    validateEvidenceRecord(record);
     const searchableText = [
       record.id,
       record.name,
@@ -84,8 +94,8 @@ export function getEvidenceSizeBytes(record) {
 }
 
 export function formatBytes(byteLength) {
-  if (!Number.isFinite(byteLength) || byteLength < 0) {
-    throw new RangeError("Byte length must be a finite, non-negative number.");
+  if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
+    throw new RangeError("Byte length must be a safe, non-negative integer.");
   }
 
   if (byteLength < 1024) return `${byteLength} B`;
