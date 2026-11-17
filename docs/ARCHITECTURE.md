@@ -1,6 +1,6 @@
 # NEXUS Architecture
 
-**Status:** Early implementation  \
+**Status:** Early implementation  
 **Architecture style:** Lightweight layered frontend
 
 ## Current implementation
